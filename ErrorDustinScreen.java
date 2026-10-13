@@ -5,16 +5,22 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.ingame.InventoryScreen;
 import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.util.InputUtil;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.MathHelper;
+import org.lwjgl.glfw.GLFW;
 
 public class ErrorDustinScreen extends Screen {
-    private static final int PW = 300, PH = 190;
+    private static final int PW = 300, PH = 210;
     private final ItemStack web = new ItemStack(Items.COBWEB);
     private long openTime;
     private int px, py;
+
+    private KeyBinding listening = null;
+    private GreenButton webToggle, waterToggle, leverToggle, webBind, waterBind, guiBind;
 
     public ErrorDustinScreen() {
         super(Text.literal("errordustin"));
@@ -26,19 +32,83 @@ public class ErrorDustinScreen extends Screen {
         px = (width - PW) / 2;
         py = (height - PH) / 2;
 
-        addDrawableChild(new GreenButton(px + 165, py + 62, 120, 22, label("Pajęczyna", ErrorDustinConfig.webEnabled), b -> {
+        webToggle = addDrawableChild(new GreenButton(px + 165, py + 54, 64, 22, Text.empty(), b -> {
             ErrorDustinConfig.webEnabled = !ErrorDustinConfig.webEnabled;
-            b.setMessage(label("Pajęczyna", ErrorDustinConfig.webEnabled));
+            ErrorDustinConfig.save();
+            refresh();
         }));
-        addDrawableChild(new GreenButton(px + 165, py + 92, 120, 22, label("Woda", ErrorDustinConfig.waterEnabled), b -> {
+        webBind = addDrawableChild(new GreenButton(px + 233, py + 54, 52, 22, Text.empty(),
+                b -> startListening(ErrorDustinClient.webKey)));
+
+        waterToggle = addDrawableChild(new GreenButton(px + 165, py + 80, 64, 22, Text.empty(), b -> {
             ErrorDustinConfig.waterEnabled = !ErrorDustinConfig.waterEnabled;
-            b.setMessage(label("Woda", ErrorDustinConfig.waterEnabled));
+            ErrorDustinConfig.save();
+            refresh();
         }));
-        addDrawableChild(new GreenButton(px + 165, py + PH - 36, 120, 22, Text.literal("Zamknij"), b -> close()));
+        waterBind = addDrawableChild(new GreenButton(px + 233, py + 80, 52, 22, Text.empty(),
+                b -> startListening(ErrorDustinClient.waterKey)));
+
+        leverToggle = addDrawableChild(new GreenButton(px + 165, py + 106, 120, 22, Text.empty(), b -> {
+            ErrorDustinConfig.leverEnabled = !ErrorDustinConfig.leverEnabled;
+            ErrorDustinConfig.save();
+            refresh();
+        }));
+
+        guiBind = addDrawableChild(new GreenButton(px + 165, py + 132, 120, 22, Text.empty(),
+                b -> startListening(ErrorDustinClient.guiKey)));
+
+        addDrawableChild(new GreenButton(px + 165, py + PH - 32, 120, 22, Text.literal("Zamknij"), b -> close()));
+        refresh();
     }
 
-    private Text label(String name, boolean on) {
-        return Text.literal(name + ": " + (on ? "ON" : "OFF"));
+    private void startListening(KeyBinding key) {
+        listening = key;
+        refresh();
+    }
+
+    private String keyName(KeyBinding key, int maxWidth) {
+        if (listening == key) return "...";
+        return textRenderer.trimToWidth(key.getBoundKeyLocalizedText().getString(), maxWidth);
+    }
+
+    private void refresh() {
+        webToggle.setMessage(Text.literal("Web: " + (ErrorDustinConfig.webEnabled ? "ON" : "OFF")));
+        waterToggle.setMessage(Text.literal("Woda: " + (ErrorDustinConfig.waterEnabled ? "ON" : "OFF")));
+        leverToggle.setMessage(Text.literal("Dzwignia: " + (ErrorDustinConfig.leverEnabled ? "ON" : "OFF")));
+        webBind.setMessage(Text.literal(keyName(ErrorDustinClient.webKey, 44)));
+        waterBind.setMessage(Text.literal(keyName(ErrorDustinClient.waterKey, 44)));
+        guiBind.setMessage(Text.literal("GUI: " + keyName(ErrorDustinClient.guiKey, 80)));
+    }
+
+    private void applyKey(InputUtil.Key newKey) {
+        listening.setBoundKey(newKey);
+        KeyBinding.updateKeysByCode();
+        MinecraftClient.getInstance().options.write();
+        listening = null;
+        refresh();
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (listening != null) {
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+                listening = null;
+                refresh();
+            } else {
+                applyKey(InputUtil.fromKeyCode(keyCode, scanCode));
+            }
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (listening != null) {
+            applyKey(InputUtil.Type.MOUSE.createFromCode(button));
+            return true;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     private float time() {
@@ -84,7 +154,13 @@ public class ErrorDustinScreen extends Screen {
         ctx.getMatrices().scale(1.6f, 1.6f, 1f);
         ctx.drawCenteredTextWithShadow(textRenderer, "errordustin", 0, 0, color);
         ctx.getMatrices().pop();
-        ctx.drawCenteredTextWithShadow(textRenderer, "v1.0 | 1.21.4", px + 225, py + 42, 0xFF7DFF9B);
+        ctx.drawCenteredTextWithShadow(textRenderer, "v1.0 | 1.21.4", px + 225, py + 30, 0xFF7DFF9B);
+        ctx.drawTextWithShadow(textRenderer, "Funkcja / klawisz", px + 165, py + 42, 0xFFB6FFC9);
+
+        if (listening != null) {
+            ctx.drawCenteredTextWithShadow(textRenderer, "Nacisnij klawisz (Esc = anuluj)",
+                    px + 225, py + 162, 0xFFFFE066);
+        }
 
         ClientPlayerEntity p = MinecraftClient.getInstance().player;
         if (p != null) {
@@ -93,7 +169,7 @@ public class ErrorDustinScreen extends Screen {
             ItemStack old = inv.getStack(slot);
             inv.setStack(slot, web.copy());
             try {
-                float cx = px + 80, cy = py + 100;
+                float cx = px + 80, cy = py + 110;
                 float fakeX = cx + MathHelper.sin(t * 1.2f) * 70f;
                 float fakeY = cy - 45 + MathHelper.cos(t * 0.8f) * 12f;
                 int size = (int) (52 * a);
@@ -106,7 +182,7 @@ public class ErrorDustinScreen extends Screen {
             }
         }
 
-        float cx = px + 80, cy = py + 92;
+        float cx = px + 80, cy = py + 100;
         float radius = 62 * a;
         for (int i = 0; i < 3; i++) {
             double ang = t * 1.4 + i * (Math.PI * 2 / 3);
