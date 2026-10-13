@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "id": "errordustin",
+  "version": "1.0.0",
+  "name": "errordustin",
+  "environment": "client",
+  "entrypoints": { "client": ["pl.errordustin.ErrorDustinClient"] },
+  "depends": { "fabricloader": ">=0.16.0", "minecraft": "1.21.4", "fabric-api": "*" }
+}
